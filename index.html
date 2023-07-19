@@ -1,0 +1,226 @@
+ <!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pharmapodhq Php Documentor</title>
+    <meta name="description" content="This is a sample project directory data webpage.">
+    <meta name="keywords" content="project, directory, data, search, content, filenames">
+    <meta name="author" content="Pharmapodhq">
+    <meta property="og:title" content="Project Directory Data">
+    <meta property="og:description" content="This is a sample project directory data webpage.">
+    <meta property="og:image" content="https://pharmapodhq.com/wp-content/uploads/2022/09/pharmapod-logo_landscape-1-300x80.png" >
+    <link rel="icon" type="image/png" href="https://pharmapodhq.com/wp-content/uploads/2022/09/pharmapod-logo_landscape-1-300x80.png">
+    <meta property="og:image:width" content="200">
+    <meta property="og:image:height" content="30">
+    <style>
+        ul {
+            list-style: none;
+            padding-left: 20px;
+        }
+        li.folder {
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .highlight {
+            background-color: yellow;
+            font-weight: bold;
+        }
+        .header {
+            background-color: #f0f0f0;
+            padding: 10px;
+            text-align: left;
+        }
+
+        .logo {
+            max-width: 200px;
+        }
+        input[type="text"] {
+            border: 1px solid #ccc;
+            border-radius: 25px;
+            padding: 10px 12px;
+            font-size: 16px;
+            outline: none;
+            width: 50%;
+            box-sizing: border-box;
+            margin-top: 20px;
+            margin-left: 10px;
+        }
+        .fileListOrder{
+            margin-bottom: 10px;
+        }
+        .folder{
+            margin-bottom: 10px;
+        }
+        .col2{
+            background-color: #ccc;
+        }
+        #fileContent {
+            white-space: pre-wrap; /* This will wrap the content */
+            word-wrap: break-word; /* In case a word is too long, it will break to a new line */
+            padding: 5px 0px 0px 15px;
+        }
+        .title{
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="https://pharmapodhq.com/wp-content/uploads/2022/09/pharmapod-logo_landscape-1-300x80.png" alt="Sample Logo" class="logo">
+    </div>
+
+    <div class="title">
+        <h4 style="font-size: 19px;text-transform: uppercase;">Pharmapodhq  Documentor</h4>
+    </div>
+    <div class="container" style="display: flex;flex: 1;width: 100%;height: 100%;flex-direction: row;">
+        <div class="col1">
+            <input type="text" id="folderSearchInput" placeholder="Search folder/file...">
+            <ul id="fileList" class="fileListOrder"></ul>
+        </div>
+
+        <div class="col2" style="width: 75%;">
+            <input type="text" id="contentSearchInput" style="display: none;" placeholder="Search content...">
+            <pre id="fileContent"></pre>
+        </div>
+    </div>
+
+ <script>
+          let lastFolderQuery = '';
+          let lastContentQuery = '';
+        function getFileContent(filePath, searchQuery) {
+            fetch(`http://127.0.0.1:3001/getFileContent?filePath=${encodeURIComponent(filePath)}`)
+                .then(response => response.text())
+                .then(content => {
+                    const fileContentElement = document.getElementById('fileContent');
+                    const highlightedContent = highlightContentOccurrences(content, searchQuery);
+                    fileContentElement.innerHTML = `<code><pre>${highlightedContent}</pre></code>`;
+                })
+                .catch(error => console.log(error));
+        }
+
+        function createFileLink(filePath, searchQuery) {
+            const listItem = document.createElement('li');
+            listItem.className = "fileListOrder"
+            const link = document.createElement('a');
+            const startIndex = filePath.indexOf('mso');
+            const simplifiedPath = filePath.slice(startIndex);
+            link.textContent = simplifiedPath;
+            link.href = '#';
+            link.onclick = () => displayFileContent(filePath, searchQuery); // Updated click event handler
+            listItem.appendChild(link);
+            return listItem;
+        }
+
+        function displayFileContent(filePath, searchQuery) {
+            getFileContent(filePath, searchQuery);
+        }
+
+        function highlightContentOccurrences(content, searchQuery) {
+            const regex = new RegExp(searchQuery, 'gi');
+            return content.replace(regex, '<span class="highlight">$&</span>');
+        }
+
+        function highlightFileNames(query, fileNames) {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = ''; // Clear previous list
+
+            fileNames.forEach(filePath => {
+                const link = createFileLink(filePath, query);
+                const fileName = link.textContent.toLowerCase();
+                const searchQuery = query.toLowerCase();
+                const startIndex = fileName.indexOf(searchQuery);
+                if (startIndex !== -1) {
+                    const before = link.textContent.slice(0, startIndex);
+                    const match = link.textContent.slice(startIndex, startIndex + searchQuery.length);
+                    const after = link.textContent.slice(startIndex + searchQuery.length);
+                    link.innerHTML = `${before}<span class="highlight">${match}</span>${after}`;
+                } else {
+                    link.innerHTML = link.textContent; // Reset to original text if no match
+                }
+                fileList.appendChild(link);
+            });
+        }
+
+        function filterFilenamesByContent(searchQuery) {
+            fetch(`http://127.0.0.1:3001/searchFilenames?query=${encodeURIComponent(searchQuery)}`)
+                .then(response => response.json())
+                .then(filteredFileNames => {
+                    highlightFileNames(searchQuery, filteredFileNames); // Highlight filenames based on the search query
+
+                    const fileList = document.getElementById('fileList');
+                    fileList.innerHTML = ''; // Clear previous list
+
+                    filteredFileNames.forEach(filePath => {
+                        const link = createFileLink(filePath, searchQuery);
+                        fileList.appendChild(link);
+                    });
+
+                    if (filteredFileNames.length > 0) {
+                        displayFileContent(filteredFileNames[0], searchQuery);
+                    } else {
+                        document.getElementById('fileContent').textContent = 'No matching files found.';
+                    }
+                })
+                .catch(error => console.log(error));
+        }
+
+        const folderSearchInput = document.getElementById('folderSearchInput');
+        folderSearchInput.addEventListener('input', () => {
+            const query = folderSearchInput.value;
+            performContentSearch(query);
+            lastFolderQuery = query; // Save the last folder search query
+        });
+
+        const contentSearchInput = document.getElementById('contentSearchInput');
+        contentSearchInput.addEventListener('keydown', event => {
+            if (event.key === 'Enter') {
+                const query = contentSearchInput.value;
+                filterFilenamesByContent(query); // Filter filenames first, then highlight content
+                lastContentQuery = query; // Save the last content search query
+            }
+        });
+
+        function performContentSearch(query) {
+            fetch(`http://127.0.0.1:3001/searchFilenames?query=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(fileNames => {
+                    highlightFileNames(query, fileNames); // Highlight filenames based on the search query
+
+                    const fileList = document.getElementById('fileList');
+                    fileList.innerHTML = ''; // Clear previous list
+
+                    fileNames.forEach(filePath => {
+                        const link = createFileLink(filePath, query);
+                        fileList.appendChild(link);
+                    });
+
+                    if (fileNames.length > 0) {
+                        displayFileContent(fileNames[0], query);
+                    } else {
+                        document.getElementById('fileContent').textContent = 'No matching files found.';
+                    }
+                })
+                .catch(error => console.log(error));
+        }
+
+        fetch('http://127.0.0.1:3001/getProjectData')
+        .then(response => response.json())
+        .then(data => {
+            const fileList = document.getElementById('fileList');
+            data.forEach(filePath => {
+                const listItem = createFileLink(filePath, '');
+                listItem.classList.add('folder'); // Add a class to identify folders
+                fileList.appendChild(listItem);
+            });
+
+            // Repopulate search boxes with last queries
+            folderSearchInput.value = lastFolderQuery;
+            contentSearchInput.value = lastContentQuery;
+            // Perform content search for last content query
+            performContentSearch(lastContentQuery);
+        })
+        .catch(error => console.log(error));
+ </script>
+</body>
+</html>
